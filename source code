@@ -1,0 +1,91 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
+
+
+sns.set(style="whitegrid")
+
+
+df = pd.read_csv(r"C:\Users\Canara\Downloads\heart_disease_uci.csv")
+
+print("\nFirst 5 Rows:\n", df.head())
+
+
+df.replace('?', np.nan, inplace=True)
+
+
+num_cols = df.select_dtypes(include=['float64', 'int64']).columns
+cat_cols = df.select_dtypes(include=['object']).columns
+
+
+df[num_cols] = df[num_cols].fillna(df[num_cols].mean())
+for col in cat_cols:
+    df[col] = df[col].fillna(df[col].mode()[0])
+
+
+df = pd.get_dummies(df, drop_first=True)
+
+print("\nMissing Values After Cleaning:\n", df.isnull().sum())
+
+
+df['target'] = df['num'].apply(lambda x: 1 if x > 0 else 0)
+
+
+print("\nStatistical Summary:\n", df.describe())
+
+plt.figure()
+sns.histplot(df['age'], bins=20, kde=True)
+plt.title("Age Distribution")
+plt.show()
+plt.figure()
+sns.countplot(x='target', data=df)
+plt.title("Disease Distribution (0 = No, 1 = Yes)")
+plt.show()
+corr = df.corr()
+plt.figure(figsize=(12, 8))
+sns.heatmap(corr, cmap='coolwarm')
+plt.title("Correlation Matrix")
+plt.show()
+target_corr = corr['target'].sort_values(ascending=False)
+print("\nCorrelation with Disease:\n", target_corr)
+plt.figure()
+target_corr.drop('target').head(10).plot(kind='bar')
+plt.title("Top Risk Factors")
+plt.ylabel("Correlation Value")
+plt.show()
+X = df.drop(['target', 'num', 'id'], axis=1)
+y = df['target']
+
+print("\nFeature Shape:", X.shape)
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
+
+model = RandomForestClassifier(n_estimators=100, random_state=42)
+model.fit(X_train, y_train)
+
+y_pred = model.predict(X_test)
+
+print("\nModel Accuracy:", accuracy_score(y_test, y_pred))
+print("\nConfusion Matrix:\n", confusion_matrix(y_test, y_pred))
+print("\nClassification Report:\n", classification_report(y_test, y_pred))
+
+importances = model.feature_importances_
+features = X.columns
+
+feature_importance = pd.Series(importances, index=features)
+feature_importance = feature_importance.sort_values(ascending=False)
+
+print("\nFeature Importance:\n", feature_importance.head(10))
+
+plt.figure()
+feature_importance.head(10).plot(kind='barh')
+plt.title("Top Features Influencing Disease")
+plt.xlabel("Importance Score")
+plt.show()
